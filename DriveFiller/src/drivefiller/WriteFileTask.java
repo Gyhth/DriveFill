@@ -7,6 +7,9 @@ package drivefiller;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
 
@@ -14,9 +17,11 @@ class WriteFileTask extends SwingWorker<Void, Void> {
      
      private final String DRIVE;
      private final int MAX_FILESIZE = 10000000;
+     private boolean cancelled;
      
      public WriteFileTask(String drive) {
         this.DRIVE = drive;
+        this.cancelled = false;
      }
 
      @Override
@@ -27,17 +32,29 @@ class WriteFileTask extends SwingWorker<Void, Void> {
          File writingFile;
          Long ttlDriveSizeInBytes = driveWritingTo.getTotalSpace();
          Long ttlDriveSpaceFreeInBytes = driveWritingTo.getFreeSpace();
-         try {   
-            while (driveWritingTo.getFreeSpace() < driveWritingTo.getTotalSpace()) {
-                writingFile = new File(DRIVE+fileNumber+".txt");
-                fw = new FileWriter(writingFile.getAbsoluteFile());
-                while (writingFile.length() < MAX_FILESIZE) {
-                    fw.append("1");
+         try {
+            while (!isCancelled()) {
+                while (driveWritingTo.getFreeSpace() < driveWritingTo.getTotalSpace()) {
+                    writingFile = new File(DRIVE+fileNumber+".txt");
+                    fw = new FileWriter(writingFile.getAbsoluteFile());
+                    while (writingFile.length() < MAX_FILESIZE) {
+                        fw.append("1");
+                    }
+                    fw.close();
+                    setProgress(Math.round((float) (ttlDriveSpaceFreeInBytes.doubleValue()/ttlDriveSizeInBytes.doubleValue())/2));
+                    fileNumber++;   
                 }
-                fw.close();
-                setProgress(Math.round((float) (ttlDriveSpaceFreeInBytes.doubleValue()/ttlDriveSizeInBytes.doubleValue())));
-                fileNumber++;   
-            }
+                Files.walk(Paths.get(driveWritingTo.getAbsolutePath())).forEach((Path filePath) -> {
+                    if (Files.isRegularFile(filePath)) {
+                        try {                        
+                            Files.delete(filePath);
+                            setProgress(50 + (50-Math.round((float) (ttlDriveSpaceFreeInBytes.doubleValue()/ttlDriveSizeInBytes.doubleValue())/2)));
+                        } catch (Exception e) {
+                            JOptionPane.showMessageDialog(null, "An error has occured: "+e.toString(),"Unable to delete files.", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                });
+          }
         }
         catch (Exception e) {
             JOptionPane.showMessageDialog(null, "An error has occured: "+e.getMessage(),"Unable to write files.", JOptionPane.ERROR_MESSAGE);
@@ -45,5 +62,17 @@ class WriteFileTask extends SwingWorker<Void, Void> {
         return null;
                  
     }
+     
+     public boolean getCancelled() {
+         return this.cancelled;
+     }
+     
+     public void setCancelled() {
+         this.cancelled = true;
+     }
+     
+     public void clear() {
+         this.cancelled = false;
+     }
 }
 

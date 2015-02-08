@@ -15,7 +15,8 @@ public class DriveFiller {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        MainForm form = new MainForm();     
+        MainForm form = new MainForm();
+        form.setSize(370,300);
         form.setVisible(true);
     }   
 }

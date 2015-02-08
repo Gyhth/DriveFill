@@ -21,7 +21,8 @@ import javax.swing.SwingWorker;
  * @author Owner
  */
 public class MainForm extends javax.swing.JFrame implements PropertyChangeListener {
-
+    private static WriteFileTask writeFileTask;
+    
     /**
      * Creates new form MainForm
      */
@@ -56,6 +57,7 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
         pbProgress.setVisible(false);
         lblProgress = new javax.swing.JLabel();
         lblProgress.setVisible(false);
+        btnStop = new javax.swing.JButton();
 
         jScrollPane2.setViewportView(jTextPane1);
 
@@ -97,9 +99,18 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
             }
         });
 
+        pbProgress.setPreferredSize(new java.awt.Dimension(245, 20));
         pbProgress.setStringPainted(true);
 
         lblProgress.setText("Progress:");
+
+        btnStop.setText("Stop");
+        btnStop.setEnabled(false);
+        btnStop.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnStopActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -116,19 +127,20 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
                     .addComponent(lblProgress))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(pbProgress, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(btnFillAndWipe)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(btnStop))
                             .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                 .addComponent(cbDrives, 0, 245, Short.MAX_VALUE)
                                 .addComponent(txtDriveSize)
                                 .addComponent(txtUsedSpace)
                                 .addComponent(txtFreeSpace)
-                                .addComponent(txtPercentFreeSpace))
-                            .addGroup(layout.createSequentialGroup()
-                                .addGap(53, 53, 53)
-                                .addComponent(btnFillAndWipe)))
-                        .addGap(0, 0, Short.MAX_VALUE))
-                    .addComponent(pbProgress, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 245, Short.MAX_VALUE))
+                                .addComponent(txtPercentFreeSpace)))
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
@@ -151,19 +163,22 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
                     .addComponent(lblFreeSpace)
                     .addComponent(txtFreeSpace, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(lblPercentFree)
-                    .addComponent(txtPercentFreeSpace, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(txtPercentFreeSpace, javax.swing.GroupLayout.PREFERRED_SIZE, 20, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
-                .addComponent(btnFillAndWipe)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(btnFillAndWipe)
+                    .addComponent(btnStop))
                 .addGap(34, 34, 34)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addComponent(pbProgress, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(lblProgress))
-                .addContainerGap(25, Short.MAX_VALUE))
+                .addContainerGap(22, Short.MAX_VALUE))
         );
 
         lblDriveSizeMax.getAccessibleContext().setAccessibleName("lblDriveSize");
+        btnStop.getAccessibleContext().setAccessibleName("btnStop");
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
@@ -190,10 +205,19 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
         }
     }//GEN-LAST:event_btnFillAndWipeActionPerformed
 
+    private void btnStopActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStopActionPerformed
+        if (!writeFileTask.isDone()) {
+            writeFileTask.setCancelled();
+            writeFileTask.cancel(true);
+            
+        }
+    }//GEN-LAST:event_btnStopActionPerformed
+
     private void writeFilesToDrive(String drive) throws InterruptedException {    
         File driveWritingTo = new File(drive);
-        if (driveWritingTo.canWrite()) {
-            WriteFileTask writeFileTask = new WriteFileTask(drive);
+        if (driveWritingTo.canWrite()) {           
+            writeFileTask = new WriteFileTask(drive);
+            writeFileTask.clear();
             writeFileTask.addPropertyChangeListener(this);
             writeFileTask.execute();
         }
@@ -211,12 +235,17 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
             progressBar.setValue(progress);
         }
         else if (evt.getPropertyName().equals("state") && evt.getNewValue().equals(SwingWorker.StateValue.DONE)) {
-            JComboBox drives = cbDrives;
-            String selectedDriveString = drives.getSelectedItem().toString();
-            File selectedDrive = new File(selectedDriveString);
-            toggleInputs(true);
-            updateDriveInformation(selectedDrive);
-            JOptionPane.showMessageDialog(this, "Files Written", "Task Complete",JOptionPane.INFORMATION_MESSAGE);
+                JComboBox drives = cbDrives;
+                String selectedDriveString = drives.getSelectedItem().toString();
+                File selectedDrive = new File(selectedDriveString);
+                updateDriveInformation(selectedDrive);
+            if (!writeFileTask.getCancelled()) {                              
+                JOptionPane.showMessageDialog(this, "Files Written", "Task Complete",JOptionPane.INFORMATION_MESSAGE);
+            }
+            else {
+                JOptionPane.showMessageDialog(this, "Task has been stopped.", "Task Stopped",JOptionPane.INFORMATION_MESSAGE);
+            }
+                toggleInputs(true);        
         }
     }
     
@@ -225,11 +254,13 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
         JProgressBar progressBar = pbProgress;
         JComboBox drives = cbDrives;
         JButton fillAndWipe = btnFillAndWipe;
+        JButton stop = btnStop;
         progressLabel.setVisible(!enabled);
         progressBar.setVisible(!enabled);
         drives.setEnabled(enabled);
         fillAndWipe.setEnabled(enabled);
-        drives.setEnabled(enabled);   
+        drives.setEnabled(enabled);
+        stop.setEnabled(!enabled);
     }
     
     /**
@@ -324,6 +355,7 @@ public class MainForm extends javax.swing.JFrame implements PropertyChangeListen
     
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnFillAndWipe;
+    private javax.swing.JButton btnStop;
     private javax.swing.JComboBox cbDrives;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JTextPane jTextPane1;
