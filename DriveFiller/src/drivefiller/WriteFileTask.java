@@ -27,6 +27,7 @@ class WriteFileTask extends SwingWorker<Void, Void> {
      @Override
      public Void doInBackground() {
          File driveWritingTo = new File(DRIVE);
+         int writeFileSize;
          Integer fileNumber = 1;  
          FileWriter fw;
          File writingFile;
@@ -35,9 +36,15 @@ class WriteFileTask extends SwingWorker<Void, Void> {
          try {
             while (!isCancelled()) {
                 while (driveWritingTo.getFreeSpace() < driveWritingTo.getTotalSpace()) {
+                    if (driveWritingTo.getFreeSpace() < MAX_FILESIZE) {
+                        writeFileSize = (int) driveWritingTo.getFreeSpace();
+                    }
+                    else {
+                        writeFileSize = MAX_FILESIZE;
+                    }
                     writingFile = new File(DRIVE+fileNumber+".txt");
                     fw = new FileWriter(writingFile.getAbsoluteFile());
-                    while (writingFile.length() < MAX_FILESIZE) {
+                    while (writingFile.length() < writeFileSize) {
                         fw.append("1");
                     }
                     fw.close();
