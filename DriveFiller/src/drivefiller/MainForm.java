@@ -5,19 +5,22 @@
  */
 package drivefiller;
 
-
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import javax.swing.JComboBox;
 import java.io.File;
-import java.io.FileWriter;
+import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JProgressBar;
 import javax.swing.JTextField;
-import javax.swing.JTextPane;
+import javax.swing.SwingWorker;
 
 /**
  *
  * @author Owner
  */
-public class MainForm extends javax.swing.JFrame {
+public class MainForm extends javax.swing.JFrame implements PropertyChangeListener {
 
     /**
      * Creates new form MainForm
@@ -49,10 +52,16 @@ public class MainForm extends javax.swing.JFrame {
         txtFreeSpace = new javax.swing.JTextField();
         txtPercentFreeSpace = new javax.swing.JTextField();
         btnFillAndWipe = new javax.swing.JButton();
+        pbProgress = new javax.swing.JProgressBar();
+        pbProgress.setVisible(false);
+        lblProgress = new javax.swing.JLabel();
+        lblProgress.setVisible(false);
 
         jScrollPane2.setViewportView(jTextPane1);
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setTitle("Drive Wiper");
+        setResizable(false);
 
         lblDrives.setText("Drive:");
         lblDrives.setName("lblDrive"); // NOI18N
@@ -88,31 +97,39 @@ public class MainForm extends javax.swing.JFrame {
             }
         });
 
+        pbProgress.setStringPainted(true);
+
+        lblProgress.setText("Progress:");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(lblPercentFree)
+                    .addComponent(lblDrives)
+                    .addComponent(lblFreeSpace)
+                    .addComponent(lblDriveSizeMax)
+                    .addComponent(lblUsedSpace)
+                    .addComponent(lblProgress))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                            .addComponent(lblPercentFree)
-                            .addComponent(lblDrives)
-                            .addComponent(lblFreeSpace)
-                            .addComponent(lblDriveSizeMax)
-                            .addComponent(lblUsedSpace))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(cbDrives, 0, 166, Short.MAX_VALUE)
-                            .addComponent(txtDriveSize)
-                            .addComponent(txtUsedSpace)
-                            .addComponent(txtFreeSpace)
-                            .addComponent(txtPercentFreeSpace)))
-                    .addGroup(layout.createSequentialGroup()
-                        .addGap(109, 109, 109)
-                        .addComponent(btnFillAndWipe)))
-                .addContainerGap(59, Short.MAX_VALUE))
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                .addComponent(cbDrives, 0, 245, Short.MAX_VALUE)
+                                .addComponent(txtDriveSize)
+                                .addComponent(txtUsedSpace)
+                                .addComponent(txtFreeSpace)
+                                .addComponent(txtPercentFreeSpace))
+                            .addGroup(layout.createSequentialGroup()
+                                .addGap(53, 53, 53)
+                                .addComponent(btnFillAndWipe)))
+                        .addGap(0, 0, Short.MAX_VALUE))
+                    .addComponent(pbProgress, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 245, Short.MAX_VALUE))
+                .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -139,7 +156,11 @@ public class MainForm extends javax.swing.JFrame {
                     .addComponent(txtPercentFreeSpace, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
                 .addComponent(btnFillAndWipe)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(34, 34, 34)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(pbProgress, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(lblProgress))
+                .addContainerGap(25, Short.MAX_VALUE))
         );
 
         lblDriveSizeMax.getAccessibleContext().setAccessibleName("lblDriveSize");
@@ -158,33 +179,57 @@ public class MainForm extends javax.swing.JFrame {
         final String confirmString = "Are you sure you wish to fill this drive?";
         int dialogResult = JOptionPane.showConfirmDialog(this, confirmString, "Confirm Fill and Wipe", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (dialogResult == JOptionPane.YES_OPTION) {
-            JOptionPane.showMessageDialog(this, "You Accepted");
-            writeFilesToDrive(cbDrives.getSelectedItem().toString());
+            try {
+                toggleInputs(false);                 
+                writeFilesToDrive(cbDrives.getSelectedItem().toString());
+            }
+            catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "An error has occured:" + e.getMessage(),"Error",JOptionPane.ERROR_MESSAGE);
+                toggleInputs(true);
+            }
         }
     }//GEN-LAST:event_btnFillAndWipeActionPerformed
 
-    private void writeFilesToDrive(String drive) {
-        final int MAX_FILESIZE = 10000000;
+    private void writeFilesToDrive(String drive) throws InterruptedException {    
         File driveWritingTo = new File(drive);
-        new Thread(){
-                public void run() {
-                    Integer fileNumber = 1;
-                    File writingFile = new File(drive+fileNumber+".txt");                    
-                    try {   
-                        FileWriter fw = new FileWriter(writingFile.getAbsoluteFile());
-                        while (driveWritingTo.getFreeSpace() < driveWritingTo.getTotalSpace()) {
-                            while (writingFile.length() < MAX_FILESIZE) {
-                                fw.append("1");
-                            }
-                            fileNumber++;
-                            writingFile = new File(drive+fileNumber+".txt");
-                            fw = new FileWriter(writingFile.getAbsoluteFile());
-                        }
-                    }
-                    catch (Exception e) {        
-                    }
-                }
-        }.start();
+        if (driveWritingTo.canWrite()) {
+            WriteFileTask writeFileTask = new WriteFileTask(drive);
+            writeFileTask.addPropertyChangeListener(this);
+            writeFileTask.execute();
+        }
+        else {
+            JOptionPane.showMessageDialog(this, "You do not have permissions to write to that location.", "Invalid Permissions", JOptionPane.ERROR_MESSAGE);
+            toggleInputs(true);
+        }
+    }
+    
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+        JProgressBar progressBar = pbProgress;
+        if (evt.getPropertyName().equals("progress")) {
+            int progress = (Integer) evt.getNewValue();
+            progressBar.setValue(progress);
+        }
+        else if (evt.getPropertyName().equals("state") && evt.getNewValue().equals(SwingWorker.StateValue.DONE)) {
+            JComboBox drives = cbDrives;
+            String selectedDriveString = drives.getSelectedItem().toString();
+            File selectedDrive = new File(selectedDriveString);
+            toggleInputs(true);
+            updateDriveInformation(selectedDrive);
+            JOptionPane.showMessageDialog(this, "Files Written", "Task Complete",JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+    
+    private void toggleInputs(boolean enabled) {
+        JLabel progressLabel = lblProgress;
+        JProgressBar progressBar = pbProgress;
+        JComboBox drives = cbDrives;
+        JButton fillAndWipe = btnFillAndWipe;
+        progressLabel.setVisible(!enabled);
+        progressBar.setVisible(!enabled);
+        drives.setEnabled(enabled);
+        fillAndWipe.setEnabled(enabled);
+        drives.setEnabled(enabled);   
     }
     
     /**
@@ -244,8 +289,7 @@ public class MainForm extends javax.swing.JFrame {
         driveSize.setText(ttlDriveSize);
         driveUsedSpace.setText(ttlDriveSpaceUsed);
         driveFreeSpace.setText(ttlDriveSpaceFree);
-        drivePercentFree.setText(ttlDriveSpaceFreePercent);
-        
+        drivePercentFree.setText(ttlDriveSpaceFreePercent);        
     }
     
     private String calculateByteSize(Long driveSize) {
@@ -287,7 +331,9 @@ public class MainForm extends javax.swing.JFrame {
     private javax.swing.JLabel lblDrives;
     private javax.swing.JLabel lblFreeSpace;
     private javax.swing.JLabel lblPercentFree;
+    private javax.swing.JLabel lblProgress;
     private javax.swing.JLabel lblUsedSpace;
+    private javax.swing.JProgressBar pbProgress;
     private javax.swing.JTextField txtDriveSize;
     private javax.swing.JTextField txtFreeSpace;
     private javax.swing.JTextField txtPercentFreeSpace;
